@@ -1298,3 +1298,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `opentelemetry-ext-wsgi` Initial release
 - `opentelemetry-ext-http-requests` Initial release
+
+### Added
+
+- `Added support for PyPy3` Initial release
+## [#1033](https://github.com/open-telemetry/opentelemetry-python-contrib/issues/1033)
+
+
