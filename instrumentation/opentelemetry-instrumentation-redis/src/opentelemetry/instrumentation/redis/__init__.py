@@ -64,6 +64,8 @@ this function signature is:  def request_hook(span: Span, instance: redis.connec
 response_hook (Callable) - a function with extra user-defined logic to be performed after performing the request
 this function signature is: def response_hook(span: Span, instance: redis.connection.Connection, response) -> None
 
+sanitize_query (Boolean) - default False, enable the Redis query sanitization
+
 for example:
 
 .. code: python
@@ -86,10 +88,27 @@ for example:
     client = redis.StrictRedis(host="localhost", port=6379)
     client.get("my-key")
 
+Configuration
+-------------
+
+Query sanitization
+******************
+To enable query sanitization with an environment variable, set
+``OTEL_PYTHON_INSTRUMENTATION_SANITIZE_REDIS`` to "true".
+
+For example,
+
+::
+
+    export OTEL_PYTHON_INSTRUMENTATION_SANITIZE_REDIS="true"
+
+will result in traced queries like "SET ? ?".
+
 API
 ---
 """
 import typing
+from os import environ
 from typing import Any, Collection
 
 import redis
@@ -97,6 +116,9 @@ from wrapt import wrap_function_wrapper
 
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+from opentelemetry.instrumentation.redis.environment_variables import (
+    OTEL_PYTHON_INSTRUMENTATION_SANITIZE_REDIS,
+)
 from opentelemetry.instrumentation.redis.package import _instruments
 from opentelemetry.instrumentation.redis.util import (
     _extract_conn_attributes,
@@ -123,7 +145,7 @@ if redis.VERSION >= _REDIS_ASYNCIO_VERSION:
     import redis.asyncio
 
 _REDIS_CLUSTER_VERSION = (4, 1, 0)
-_REDIS_ASYNCIO_CLUSTER_VERSION = (4, 3, 0)
+_REDIS_ASYNCIO_CLUSTER_VERSION = (4, 3, 2)
 
 
 def _set_connection_attributes(span, conn):
@@ -139,10 +161,11 @@ def _instrument(
     tracer,
     request_hook: _RequestHookT = None,
     response_hook: _ResponseHookT = None,
+    sanitize_query: bool = False,
 ):
     def _traced_execute_command(func, instance, args, kwargs):
-        query = _format_command_args(args)
-        name = ""
+        query = _format_command_args(args, sanitize_query)
+
         if len(args) > 0 and args[0]:
             name = args[0]
         else:
@@ -170,7 +193,9 @@ def _instrument(
             )
 
             cmds = [
-                _format_command_args(c.args if hasattr(c, "args") else c[0])
+                _format_command_args(
+                    c.args if hasattr(c, "args") else c[0], sanitize_query
+                )
                 for c in command_stack
             ]
             resource = "\n".join(cmds)
@@ -282,6 +307,15 @@ class RedisInstrumentor(BaseInstrumentor):
             tracer,
             request_hook=kwargs.get("request_hook"),
             response_hook=kwargs.get("response_hook"),
+            sanitize_query=kwargs.get(
+                "sanitize_query",
+                environ.get(
+                    OTEL_PYTHON_INSTRUMENTATION_SANITIZE_REDIS, "false"
+                )
+                .lower()
+                .strip()
+                == "true",
+            ),
         )
 
     def _uninstrument(self, **kwargs):

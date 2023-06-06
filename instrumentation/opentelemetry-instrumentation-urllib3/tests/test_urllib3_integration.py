@@ -29,17 +29,32 @@ from opentelemetry.propagate import get_global_textmap, set_global_textmap
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.test.mock_textmap import MockTextMapPropagator
 from opentelemetry.test.test_base import TestBase
+from opentelemetry.util.http import get_excluded_urls
 
 # pylint: disable=too-many-public-methods
 
 
 class TestURLLib3Instrumentor(TestBase):
-
     HTTP_URL = "http://httpbin.org/status/200"
     HTTPS_URL = "https://httpbin.org/status/200"
 
     def setUp(self):
         super().setUp()
+
+        self.env_patch = mock.patch.dict(
+            "os.environ",
+            {
+                "OTEL_PYTHON_URLLIB3_EXCLUDED_URLS": "http://localhost/env_excluded_arg/123,env_excluded_noarg"
+            },
+        )
+        self.env_patch.start()
+
+        self.exclude_patch = mock.patch(
+            "opentelemetry.instrumentation.urllib3._excluded_urls_from_env",
+            get_excluded_urls("URLLIB3"),
+        )
+        self.exclude_patch.start()
+
         URLLib3Instrumentor().instrument()
 
         httpretty.enable(allow_net_connect=False)
@@ -158,6 +173,36 @@ class TestURLLib3Instrumentor(TestBase):
         response = pool.urlopen(method="GET", url="/status/200")
 
         self.assert_success_span(response, url)
+
+    def test_excluded_urls_explicit(self):
+        url_201 = "http://httpbin.org/status/201"
+        httpretty.register_uri(
+            httpretty.GET,
+            url_201,
+            status=201,
+        )
+
+        URLLib3Instrumentor().uninstrument()
+        URLLib3Instrumentor().instrument(excluded_urls=".*/201")
+        self.perform_request(self.HTTP_URL)
+        self.perform_request(url_201)
+
+        self.assert_span(num_spans=1)
+
+    def test_excluded_urls_from_env(self):
+        url = "http://localhost/env_excluded_arg/123"
+        httpretty.register_uri(
+            httpretty.GET,
+            url,
+            status=200,
+        )
+
+        URLLib3Instrumentor().uninstrument()
+        URLLib3Instrumentor().instrument()
+        self.perform_request(self.HTTP_URL)
+        self.perform_request(url)
+
+        self.assert_span(num_spans=1)
 
     def test_uninstrument(self):
         URLLib3Instrumentor().uninstrument()
@@ -309,3 +354,33 @@ class TestURLLib3Instrumentor(TestBase):
         )
         self.assertIn("request_hook_body", span.attributes)
         self.assertEqual(span.attributes["request_hook_body"], body)
+
+    def test_request_positional_body(self):
+        def request_hook(span, request, headers, body):
+            span.set_attribute("request_hook_body", body)
+
+        URLLib3Instrumentor().uninstrument()
+        URLLib3Instrumentor().instrument(
+            request_hook=request_hook,
+        )
+
+        body = "param1=1&param2=2"
+
+        pool = urllib3.HTTPConnectionPool("httpbin.org")
+        response = pool.urlopen("POST", "/status/200", body)
+
+        self.assertEqual(b"Hello!", response.data)
+
+        span = self.assert_span()
+
+        self.assertIn("request_hook_body", span.attributes)
+        self.assertEqual(span.attributes["request_hook_body"], body)
+
+    def test_no_op_tracer_provider(self):
+        URLLib3Instrumentor().uninstrument()
+        tracer_provider = trace.NoOpTracerProvider()
+        URLLib3Instrumentor().instrument(tracer_provider=tracer_provider)
+
+        response = self.perform_request(self.HTTP_URL)
+        self.assertEqual(b"Hello!", response.data)
+        self.assert_span(num_spans=0)

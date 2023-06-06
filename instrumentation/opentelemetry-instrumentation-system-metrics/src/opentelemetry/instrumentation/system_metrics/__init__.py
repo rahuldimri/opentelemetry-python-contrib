@@ -33,8 +33,9 @@ following metrics are configured:
         "system.network.errors": ["transmit", "receive"],
         "system.network.io": ["transmit", "receive"],
         "system.network.connections": ["family", "type"],
-        "runtime.memory": ["rss", "vms"],
-        "runtime.cpu.time": ["user", "system"],
+        "system.thread_count": None
+        "process.runtime.memory": ["rss", "vms"],
+        "process.runtime.cpu.time": ["user", "system"],
     }
 
 Usage
@@ -60,8 +61,8 @@ Usage
         "system.memory.usage": ["used", "free", "cached"],
         "system.cpu.time": ["idle", "user", "system", "irq"],
         "system.network.io": ["transmit", "receive"],
-        "runtime.memory": ["rss", "vms"],
-        "runtime.cpu.time": ["user", "system"],
+        "process.runtime.memory": ["rss", "vms"],
+        "process.runtime.cpu.time": ["user", "system"],
     }
     SystemMetricsInstrumentor(config=configuration).instrument()
 
@@ -72,12 +73,13 @@ API
 import gc
 import os
 import sys
+import threading
 from platform import python_implementation
 from typing import Collection, Dict, Iterable, List, Optional
 
 import psutil
 
-# FIXME Remove this pyling disabling line when Github issue is cleared
+# FIXME Remove this pylint disabling line when Github issue is cleared
 # pylint: disable=no-name-in-module
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.instrumentation.system_metrics.package import _instruments
@@ -100,9 +102,10 @@ _DEFAULT_CONFIG = {
     "system.network.errors": ["transmit", "receive"],
     "system.network.io": ["transmit", "receive"],
     "system.network.connections": ["family", "type"],
-    "runtime.memory": ["rss", "vms"],
-    "runtime.cpu.time": ["user", "system"],
-    "runtime.gc_count": None,
+    "system.thread_count": None,
+    "process.runtime.memory": ["rss", "vms"],
+    "process.runtime.cpu.time": ["user", "system"],
+    "process.runtime.gc_count": None,
 }
 
 class MyHooks(object):
@@ -156,6 +159,8 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
         self._system_network_errors_labels = self._labels.copy()
         self._system_network_io_labels = self._labels.copy()
         self._system_network_connections_labels = self._labels.copy()
+
+        self._system_thread_count_labels = self._labels.copy()
 
         self._runtime_memory_labels = self._labels.copy()
         self._runtime_cpu_time_labels = self._labels.copy()
@@ -326,25 +331,32 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
                 unit="connections",
             )
 
-        if "runtime.memory" in self._config:
-            self._meter.create_observable_counter(
-                name=f"runtime.{self._python_implementation}.memory",
+        if "system.thread_count" in self._config:
+            self._meter.create_observable_gauge(
+                name="system.thread_count",
+                callbacks=[self._get_system_thread_count],
+                description="System active threads count",
+            )
+
+        if "process.runtime.memory" in self._config:
+            self._meter.create_observable_up_down_counter(
+                name=f"process.runtime.{self._python_implementation}.memory",
                 callbacks=[self._get_runtime_memory],
                 description=f"Runtime {self._python_implementation} memory",
                 unit="bytes",
             )
 
-        if "runtime.cpu.time" in self._config:
+        if "process.runtime.cpu.time" in self._config:
             self._meter.create_observable_counter(
-                name=f"runtime.{self._python_implementation}.cpu_time",
+                name=f"process.runtime.{self._python_implementation}.cpu_time",
                 callbacks=[self._get_runtime_cpu_time],
                 description=f"Runtime {self._python_implementation} CPU time",
                 unit="seconds",
             )
 
-        if "runtime.gc_count" in self._config:
+        if "process.runtime.gc_count" in self._config:
             self._meter.create_observable_counter(
-                name=f"runtime.{self._python_implementation}.gc_count",
+                name=f"process.runtime.{self._python_implementation}.gc_count",
                 callbacks=[self._get_runtime_gc_count],
                 description=f"Runtime {self._python_implementation} GC count",
                 unit="bytes",
@@ -435,7 +447,9 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
             if hasattr(system_swap, metric):
                 self._system_swap_utilization_labels["state"] = metric
                 yield Observation(
-                    getattr(system_swap, metric) / system_swap.total,
+                    getattr(system_swap, metric) / system_swap.total
+                    if system_swap.total
+                    else 0,
                     self._system_swap_utilization_labels.copy(),
                 )
 
@@ -606,12 +620,20 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
                 connection_counter["labels"],
             )
 
+    def _get_system_thread_count(
+        self, options: CallbackOptions
+    ) -> Iterable[Observation]:
+        """Observer callback for active thread count"""
+        yield Observation(
+            threading.active_count(), self._system_thread_count_labels
+        )
+
     def _get_runtime_memory(
         self, options: CallbackOptions
     ) -> Iterable[Observation]:
         """Observer callback for runtime memory"""
         proc_memory = self._proc.memory_info()
-        for metric in self._config["runtime.memory"]:
+        for metric in self._config["process.runtime.memory"]:
             if hasattr(proc_memory, metric):
                 self._runtime_memory_labels["type"] = metric
                 yield Observation(
@@ -624,7 +646,7 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
     ) -> Iterable[Observation]:
         """Observer callback for runtime CPU time"""
         proc_cpu = self._proc.cpu_times()
-        for metric in self._config["runtime.cpu.time"]:
+        for metric in self._config["process.runtime.cpu.time"]:
             if hasattr(proc_cpu, metric):
                 self._runtime_cpu_time_labels["type"] = metric
                 yield Observation(

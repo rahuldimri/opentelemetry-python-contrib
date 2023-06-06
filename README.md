@@ -95,15 +95,16 @@ Meeting notes are available as a public [Google doc](https://docs.google.com/doc
 Approvers ([@open-telemetry/python-approvers](https://github.com/orgs/open-telemetry/teams/python-approvers)):
 
 - [Aaron Abbott](https://github.com/aabmass), Google
-- [Nathaniel Ruiz Nowell](https://github.com/NathanielRN), AWS
-- [Owais Lone](https://github.com/owais), Splunk
+- [Jeremy Voss](https://github.com/jeremydvoss), Microsoft
 - [Sanket Mehta](https://github.com/sanketmehta28), Cisco
-- [Ashutosh Goel](https://github.com/ashu658), Cisco
+- [Shalev Roda](https://github.com/shalevr), Cisco
 
 Emeritus Approvers:
 
-- [Hector Hernandez](https://github.com/hectorhdzg), Microsoft
+- [Héctor Hernández](https://github.com/hectorhdzg), Microsoft
 - [Yusuke Tsutsumi](https://github.com/toumorokoshi), Google
+- [Nathaniel Ruiz Nowell](https://github.com/NathanielRN), AWS
+- [Ashutosh Goel](https://github.com/ashu658), Cisco
 
 *Find more about the approver role in [community repository](https://github.com/open-telemetry/community/blob/main/community-membership.md#approver).*
 
@@ -111,11 +112,12 @@ Maintainers ([@open-telemetry/python-maintainers](https://github.com/orgs/open-t
 
 - [Diego Hurtado](https://github.com/ocelotl), Lightstep
 - [Leighton Chen](https://github.com/lzchen), Microsoft
-- [Srikanth Chekuri](https://github.com/srikanthccv)
 
 Emeritus Maintainers:
 
 - [Alex Boten](https://github.com/codeboten), Lightstep
+- [Owais Lone](https://github.com/owais), Splunk
+- [Srikanth Chekuri](https://github.com/srikanthccv), signoz.io
 
 *Find more about the maintainer role in [community repository](https://github.com/open-telemetry/community/blob/main/community-membership.md#maintainer).*
 
@@ -124,7 +126,7 @@ Emeritus Maintainers:
 1. Go to your Contrib repo directory. `cd ~/git/opentelemetry-python-contrib`.
 2. Create a virtual env in your Contrib repo directory. `python3 -m venv my_test_venv`.
 3. Activate your virtual env. `source my_test_venv/bin/activate`.
-4. Make sure you have `tox` installed. `pip install tox`.
+4. Make sure you have `tox` installed. `pip install tox==3.27.1`.
 5. Run tests for a package. (e.g. `tox -e test-instrumentation-flask`.)
 
 ### Thanks to all the people who already contributed!
