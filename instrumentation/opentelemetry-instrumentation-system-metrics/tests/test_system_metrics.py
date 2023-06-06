@@ -20,7 +20,7 @@ from unittest import mock
 
 from opentelemetry.instrumentation.system_metrics import( 
     MyHooks, 
-    SystemMetricsInstrumentor
+    SystemMetricsInstrumentor,
 )
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
