@@ -108,6 +108,7 @@ _DEFAULT_CONFIG = {
     "process.runtime.gc_count": None,
 }
 
+
 class MyHooks(object):
     done = False
 
@@ -124,7 +125,8 @@ class MyHooks(object):
     def on_gc_collect(self, stats):
         print("gc-collect-done: ", stats.count)
         self.done = True
-        
+
+    
 class SystemMetricsInstrumentor(BaseInstrumentor):
     def __init__(
         self,
