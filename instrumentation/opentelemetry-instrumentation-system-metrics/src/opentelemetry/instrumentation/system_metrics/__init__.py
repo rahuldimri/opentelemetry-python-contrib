@@ -122,9 +122,9 @@ class MyHooks(object):
         new = gc.GcCollectStepStats.GC_STATES[stats.newstate]
 
     def on_gc_collect(self, stats):
-        print ("gc-collect-done: ", stats.count)
+        print("gc-collect-done: ", stats.count)
         self.done = True
-
+        
 class SystemMetricsInstrumentor(BaseInstrumentor):
     def __init__(
         self,
