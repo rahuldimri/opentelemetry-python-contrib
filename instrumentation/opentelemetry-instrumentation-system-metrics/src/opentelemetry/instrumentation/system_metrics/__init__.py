@@ -112,14 +112,17 @@ class MyHooks(object):
     done = False
 
     def on_gc_minor(self, stats):
-        print ('gc-minor: count = %d, duration = %d' % (stats.count, stats.duration))
+        print(
+            "gc-minor: count = %d, duration = %d"
+            % (stats.count, stats.duration)
+        )
 
     def on_gc_collect_step(self, stats):
         old = gc.GcCollectStepStats.GC_STATES[stats.oldstate]
         new = gc.GcCollectStepStats.GC_STATES[stats.newstate]
 
     def on_gc_collect(self, stats):
-        print ('gc-collect-done: ', stats.count)
+        print ("gc-collect-done: ", stats.count)
         self.done = True
 
 class SystemMetricsInstrumentor(BaseInstrumentor):
@@ -658,19 +661,19 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
         self, options: CallbackOptions
     ) -> Iterable[Observation]:
         """Observer callback for garbage collection"""
-        if self._python_implementation == 'pypy':
+        if self._python_implementation == "pypy":
             gc.hooks.set(self.hooks)
-            #start garbage collection manually
+            # start garbage collection manually
             gc.collect()
-            #check if the garbage collection is done or not
+            # check if the garbage collection is done or not
             while not self.hooks.done:
                 pass
 
             count = self.hooks.on_gc_collect.stats.count
 
-            #reset the hooks
+            # reset the hooks
             gc.hooks.set(None)
-            self._runtime_gc_count_labels["count"] = 'pypy_gc'
+            self._runtime_gc_count_labels["count"] = "pypy_gc"
 
             yield Observation(count, self._runtime_gc_count_labels.copy())
 
