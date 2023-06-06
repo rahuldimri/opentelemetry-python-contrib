@@ -19,7 +19,7 @@ from platform import python_implementation
 from unittest import mock
 
 from opentelemetry.instrumentation.system_metrics import (
-    SystemMetricsInstrumentor,
+    SystemMetricsInstrumentor, MyHooks
 )
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
@@ -721,3 +721,19 @@ class TestSystemMetrics(TestBase):
             _SystemMetricsResult({"count": "2"}, 3),
         ]
         self._test_metrics(f"runtime.{self.implementation}.gc_count", expected)
+
+
+    @mock.patch("gc.hooks")
+    def test_runtime_get_pypy_count(self, mock_gc_hooks):
+        mock_hooks = MyHooks()
+        mock_gc_hooks.set.return_value = None
+        mock_gc_hooks.get.return_value = mock_hooks
+        mock_hooks.done = True
+        mock_hooks.on_gc_collect.stats.count = 2
+        expected =[
+            _SystemMetricsResult({"count":"pypy_gc"}, 2)
+            ]
+        with mock.patch.object(self, "_python_implementation", return_value="pypy"):
+            self._test_metrics(
+                f"Process.runtime.{self.implementation}.gc_count", expected
+            )

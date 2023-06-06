@@ -71,6 +71,7 @@ API
 
 import gc
 import os
+import sys
 from platform import python_implementation
 from typing import Collection, Dict, Iterable, List, Optional
 
@@ -104,6 +105,19 @@ _DEFAULT_CONFIG = {
     "runtime.gc_count": None,
 }
 
+class MyHooks(object):
+    done = False
+
+    def on_gc_minor(self, stats):
+        print ('gc-minor: count = %d, duration = %d' % (stats.count, stats.duration))
+
+    def on_gc_collect_step(self, stats):
+        old = gc.GcCollectStepStats.GC_STATES[stats.oldstate]
+        new = gc.GcCollectStepStats.GC_STATES[stats.newstate]
+
+    def on_gc_collect(self, stats):
+        print ('gc-collect-done: ', stats.count)
+        self.done = True
 
 class SystemMetricsInstrumentor(BaseInstrumentor):
     def __init__(
@@ -118,6 +132,7 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
             self._config = config
         self._labels = {} if labels is None else labels
         self._meter = None
+        self.hooks = MyHooks()
         self._python_implementation = python_implementation().lower()
 
         self._proc = psutil.Process(os.getpid())
@@ -621,6 +636,23 @@ class SystemMetricsInstrumentor(BaseInstrumentor):
         self, options: CallbackOptions
     ) -> Iterable[Observation]:
         """Observer callback for garbage collection"""
-        for index, count in enumerate(gc.get_count()):
-            self._runtime_gc_count_labels["count"] = str(index)
+        if self._python_implementation == 'pypy':
+            gc.hooks.set(self.hooks)
+            #start garbage collection manually
+            gc.collect()
+            #check if the garbage collection is done or not
+            while not self.hooks.done:
+                pass
+
+            count = self.hooks.on_gc_collect.stats.count
+
+            #reset the hooks
+            gc.hooks.set(None)
+            self._runtime_gc_count_labels["count"] = 'pypy_gc'
+
             yield Observation(count, self._runtime_gc_count_labels.copy())
+
+        else:
+            for index, count in enumerate(gc.get_count()):
+                self._runtime_gc_count_labels["count"] = str(index)
+                yield Observation(count, self._runtime_gc_count_labels.copy())
