@@ -126,7 +126,7 @@ class MyHooks(object):
         print("gc-collect-done: ", stats.count)
         self.done = True
 
-    
+
 class SystemMetricsInstrumentor(BaseInstrumentor):
     def __init__(
         self,
