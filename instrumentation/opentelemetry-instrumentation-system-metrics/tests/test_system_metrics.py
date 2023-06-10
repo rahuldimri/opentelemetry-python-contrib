@@ -18,9 +18,11 @@ from collections import namedtuple
 from platform import python_implementation
 from unittest import mock
 
-from opentelemetry.instrumentation.system_metrics import ( 
-    MyHooks, 
+from opentelemetry.instrumentation.system_metrics import( 
     SystemMetricsInstrumentor,
+)
+from opentelemetry.instrumentation.system_metrics import( 
+    MyHooks,
 )
 
 from opentelemetry.sdk.metrics import MeterProvider
