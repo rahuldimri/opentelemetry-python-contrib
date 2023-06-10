@@ -22,8 +22,6 @@ from opentelemetry.instrumentation.dbapi import (
     MyHooks,
     SystemMetricsInstrumentor,
 )
-
-
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.test.test_base import TestBase
