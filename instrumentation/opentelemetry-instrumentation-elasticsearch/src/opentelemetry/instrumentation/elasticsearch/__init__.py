@@ -128,7 +128,7 @@ class ElasticsearchInstrumentor(BaseInstrumentor):
     def instrumentation_dependencies(self) -> Collection[str]:
         return _instruments
 
-    def _instrument(self, **kwargs):
+    def _instrument(self, async_trasport=False, **kwargs):
         """
         Instruments elasticsearch module
         """
@@ -136,23 +136,29 @@ class ElasticsearchInstrumentor(BaseInstrumentor):
         tracer = get_tracer(__name__, __version__, tracer_provider)
         request_hook = kwargs.get("request_hook")
         response_hook = kwargs.get("response_hook")
-        _wrap(
-            elasticsearch,
-            "Transport.perform_request",
-            _wrap_perform_request(
-                tracer, self._span_name_prefix, request_hook, response_hook
-            ),
-        )
-        _wrap(
-            elasticsearch
-            "AsyncTransport.perform_request",
-            _wrap_perform_request(
-                tracer, self._span_name_prefix, request_hook, response_hook
-            ),
-        )
-    def _uninstrument(self, **kwargs):
-        unwrap(elasticsearch.Transport, "perform_request")
-        unwrap(elasticsearch.AsyncTransport, "perfrom_request")
+        if not async_trasport:
+            _wrap(
+                elasticsearch,
+                "Transport.perform_request",
+                _wrap_perform_request(
+                    tracer, self._span_name_prefix, request_hook, response_hook
+                ),
+            )
+
+        else:
+            _wrap(
+                elasticsearch,
+                "AsyncTransport.perform_request",
+                _wrap_perform_request(
+                    tracer, self._span_name_prefix, request_hook, response_hook
+                ),
+            )
+
+    def _uninstrument(self, async_trasport=False, **kwargs):
+        if not async_trasport:
+            unwrap(elasticsearch.Transport, "perform_request")
+        else:
+            unwrap(elasticsearch.AsyncTransport, "perfrom_request")
 
 
 _regex_doc_url = re.compile(r"/_doc/([^/]+)")
@@ -266,7 +272,7 @@ def _wrap_perform_async_request(
 
         with tracer.start_as_current_span(
             op_name,
-            kind=SpanKnd.Client,
+            kind=SpanKind.Client,
         ) as span:
             
             if callable(response_hook):
@@ -280,7 +286,7 @@ def _wrap_perform_async_request(
                 _set_span_attributes_from_rv(span, return_value)
 
             if callable(response_hook):
-                responce_hook(span, return_value)
+                response_hook(span, return_value)
             return return_value    
         
         return wrapper
